@@ -1,7 +1,8 @@
 use std::{
+    cmp::min,
     fs::{File, OpenOptions},
     io::{BufReader, Read, Seek, SeekFrom, Write},
-    path::{Path, PathBuf}, cmp::min,
+    path::{Path, PathBuf},
 };
 
 use bson::Document;
@@ -13,9 +14,11 @@ use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 
 /// Tool to dissect a bson file into json files for each document
-/// this tool can handle very large bson files
+/// 
+/// this tool can handle very large bson files with millions of documents
+/// and gigabytes of data.
 #[derive(Debug, Parser)]
-#[clap(version, author, about)]
+#[clap(version=env!("CARGO_PKG_VERSION"), author="Matheus Xavier <mxavier@neonimp.com>", about)]
 pub struct Args {
     /// The input file to read
     pub input: PathBuf,
@@ -53,8 +56,14 @@ struct DocOffset {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = Args::parse();
+    println!("---------------------------------------");
+    println!("BSON Dissector v{}", env!("CARGO_PKG_VERSION"));
+    println!("Copyright (c) 2023 Neon Imp");
+    println!("Licensed under the BSD-3-Clause License");
+    println!("---------------------------------------");
+    println!("");
 
+    let args = Args::parse();
     let path = args.input.as_path();
     let out_dir = args.output.as_path();
 
