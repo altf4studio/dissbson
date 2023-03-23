@@ -10,11 +10,14 @@ use clap::Parser;
 use flate2::write::{ZlibDecoder, ZlibEncoder};
 use flate2::Compression;
 use neoncore::streams::{read::read_pattern, SeekRead};
-use rayon::{prelude::{IntoParallelRefIterator, ParallelIterator}, ThreadPoolBuilder};
+use rayon::{
+    prelude::{IntoParallelRefIterator, ParallelIterator},
+    ThreadPoolBuilder,
+};
 use serde::{Deserialize, Serialize};
 
 /// Tool to dissect a bson file into json files for each document
-/// 
+///
 /// this tool can handle very large bson files with millions of documents
 /// and gigabytes of data.
 #[derive(Debug, Parser)]

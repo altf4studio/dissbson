@@ -65,6 +65,7 @@ for TARGET in $TARGETS; do
 	cp "target/$TARGET/release/$BINNAME" "dist/$TARGET"
 	zip -j "dist/$NAME-$TARGET.zip" "dist/$TARGET/$BINNAME" "dist/latest.txt" "LICENSE" "readme.md"
 	rm -rf "dist/$TARGET"
+	echo "$TARGET $NAME-$TARGET.zip" >> dist/manifest.txt
 done
 
 # Make the source distribution

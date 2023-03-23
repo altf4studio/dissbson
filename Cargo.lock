@@ -681,8 +681,9 @@ dependencies = [
 
 [[package]]
 name = "neoncore"
-version = "2.0.0"
-source = "git+https://github.com/neonimp/neoncore?branch=master#fabc6a899877f17ef754571b85376735355e2a85"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1bcf1cac9bcbfd896cefa3b73c9155af5a1000619511b8f0296f96511748991e"
 dependencies = [
  "byteorder",
  "paste",
