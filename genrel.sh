@@ -54,16 +54,16 @@ echo "$VER" > dist/latest.txt
 for TARGET in $TARGETS; do
 	# is this a windows target?
 	if [[ "$TARGET" == *windows* ]]; then
-		BINAME="$NAME.exe"
+		BINNAME="$NAME.exe"
 	else # assume it's a unix target
-		BINAME="$NAME"
+		BINNAME="$NAME"
 	fi
 
 	echo "Building $NAME for $TARGET"
 	cargo build --release --target "$TARGET"
 	mkdir -p "dist/$TARGET"
-	cp "target/$TARGET/release/$BINAME" "dist/$TARGET"
-	zip -j "dist/$NAME-$TARGET.zip" "dist/$TARGET/$BINAME" "dist/latest.txt" "LICENSE" "readme.md"
+	cp "target/$TARGET/release/$BINNAME" "dist/$TARGET"
+	zip -j "dist/$NAME-$TARGET.zip" "dist/$TARGET/$BINNAME" "dist/latest.txt" "LICENSE" "readme.md"
 	rm -rf "dist/$TARGET"
 done
 
