@@ -89,5 +89,18 @@ echo "Done building release, dist is ready for upload"
 
 # Upload the release
 echo "Uploading release"
-s3cmd put --acl-public --recursive dist/ "s3://$S3BUCKET/releases/$NAME/"
+if [ -z "$S3BUCKET" ]; then
+	echo "S3BUCKET is not set"
+	exit 1
+fi
 
+s3cmd put --recursive dist/ "s3://$S3BUCKET/releases/$NAME/"
+
+# Set the ACL on the files if SETACL is set
+if [ -n "$SETACL" ]; then
+	s3cmd setacl --acl-public --recursive "s3://$S3BUCKET/releases/$NAME/"
+fi
+
+echo "Done uploading release"
+
+echo "All done!"
