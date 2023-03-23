@@ -10,7 +10,7 @@ use clap::Parser;
 use flate2::write::{ZlibDecoder, ZlibEncoder};
 use flate2::Compression;
 use neoncore::streams::{read::read_pattern, SeekRead};
-use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
+use rayon::{prelude::{IntoParallelRefIterator, ParallelIterator}, ThreadPoolBuilder};
 use serde::{Deserialize, Serialize};
 
 /// Tool to dissect a bson file into json files for each document
@@ -26,10 +26,6 @@ pub struct Args {
     /// The output directory to write to
     #[clap(short, long, default_value = "output")]
     pub output: PathBuf,
-
-    /// The number of documents to read at a time
-    #[clap(short, long, default_value = "1000")]
-    pub batch_size: usize,
 
     /// The number of threads to use
     #[clap(short, long, default_value = "4")]
@@ -85,28 +81,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         offsets
     };
 
-    // progress bar
-    let pb = indicatif::ProgressBar::new(idx.len() as u64);
-    pb.set_style(indicatif::ProgressStyle::default_bar().template(
-        "{spinner:.green} [{elapsed_precise}] [{bar:40.red/blue}] {pos:>7}/{len:7} \n {msg}",
-    )?);
     let idx = if let Some(slice) = args.slice {
         let (start, end) = parse_slice(&slice.to_string())?;
         idx[start as usize..min(end as usize, idx.len())].to_vec()
     } else {
         idx
     };
-    println!("Loaded index data, containing {} entries", idx.len());
-    idx.par_iter().for_each(|offset| {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap()
-            .block_on(export_doc(path, out_dir, *offset, args.pretty))
-            .unwrap();
-        pb.inc(1);
-    });
 
+    // progress bar
+    let pb = indicatif::ProgressBar::new(idx.len() as u64);
+    pb.set_style(indicatif::ProgressStyle::default_bar().template(
+        "{spinner:.green} [{elapsed_precise}] [{bar:40.red/blue}] {pos:>7}/{len:7} \n {msg}",
+    )?);
+
+    println!("Loaded index data, containing {} entries", idx.len());
+    let thread_pool = ThreadPoolBuilder::new().num_threads(args.threads).build()?;
+    thread_pool.install(|| {
+        idx.par_iter().for_each(|offset| {
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(export_doc(path, out_dir, *offset, args.pretty))
+                .unwrap();
+            pb.inc(1);
+        });
+    });
     pb.finish_with_message("");
     println!("Exported {} documents to {}", idx.len(), out_dir.display());
 
