@@ -9,12 +9,15 @@ use bson::Document;
 use clap::Parser;
 use flate2::write::{ZlibDecoder, ZlibEncoder};
 use flate2::Compression;
+use lua_engine::LuaEngine;
 use neoncore::streams::{read::read_pattern, SeekRead};
 use rayon::{
     prelude::{IntoParallelRefIterator, ParallelIterator},
     ThreadPoolBuilder,
 };
 use serde::{Deserialize, Serialize};
+
+mod lua_engine;
 
 /// Tool to dissect a bson file into json files for each document
 ///
@@ -45,6 +48,10 @@ pub struct Args {
     /// Limit using a rust slice expression
     #[clap(short, long)]
     pub slice: Option<String>,
+
+    /// Lua script to run on each document
+    #[clap(short = 'S', long)]
+    pub script: Option<PathBuf>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
@@ -59,8 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("BSON Dissector v{}", env!("CARGO_PKG_VERSION"));
     println!("Copyright (c) 2023 Neon Imp");
     println!("Licensed under the BSD-3-Clause License");
-    println!("---------------------------------------");
-    println!("");
+    println!("---------------------------------------\n");
 
     let args = Args::parse();
     let path = args.input.as_path();
@@ -85,7 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let idx = if let Some(slice) = args.slice {
-        let (start, end) = parse_slice(&slice.to_string())?;
+        let (start, end) = parse_slice(&slice)?;
         idx[start as usize..min(end as usize, idx.len())].to_vec()
     } else {
         idx
@@ -101,12 +107,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let thread_pool = ThreadPoolBuilder::new().num_threads(args.threads).build()?;
     thread_pool.install(|| {
         idx.par_iter().for_each(|offset| {
-            tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap()
-                .block_on(export_doc(path, out_dir, *offset, args.pretty))
-                .unwrap();
+            if let Some(script) = &args.script {
+                let doc = apply_script(path, script, *offset).unwrap();
+                
+                
+                let json = if args.pretty {
+                    serde_json::to_string_pretty(&doc).unwrap()
+                } else {
+                    serde_json::to_string(&doc).unwrap()
+                };
+
+                let mut out_file = File::create(out_dir.join(format!("{}.json", offset.offset))).unwrap();
+                out_file.write_all(json.as_bytes()).unwrap();
+            } else {
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .block_on(export_doc(path, out_dir, *offset, args.pretty))
+                    .unwrap();
+            }
             pb.inc(1);
         });
     });
@@ -128,7 +148,7 @@ fn load_index_data<P: AsRef<Path>>(path: P) -> Result<Vec<DocOffset>, Box<dyn st
         if n == 0 {
             break;
         }
-        dec.write_all(&mut buf[..n])?;
+        dec.write_all(&buf[..n])?;
     }
     dec.finish()?;
 
@@ -183,9 +203,31 @@ fn parse_slice(slice: &str) -> Result<(u64, u64), Box<dyn std::error::Error>> {
     if parts.len() != 2 {
         return Err("Invalid slice format".into());
     }
-    let start = parts.remove(0).parse::<u64>().unwrap_or_else(|_| 0);
-    let end = parts.remove(0).parse::<u64>().unwrap_or_else(|_| !0);
+    let start = parts.remove(0).parse::<u64>().unwrap_or(0);
+    let end = parts.remove(0).parse::<u64>().unwrap_or(!0);
     Ok((start, end))
+}
+
+fn apply_script<P: AsRef<Path>>(
+    input: P,
+    script: P,
+    offset: DocOffset,
+) -> Result<Document, Box<dyn std::error::Error>> {
+    let script = script.as_ref();
+    let script = std::fs::read_to_string(script)?;
+
+    let path = input.as_ref();
+    let mut file = OpenOptions::new().read(true).open(path)?;
+    file.seek(SeekFrom::Start(offset.offset as u64))?;
+    let mut buf = vec![0u8; offset.size];
+    file.read_exact(&mut buf)?;
+    let doc = Document::from_reader(&mut buf.as_slice())?;
+
+    let lctx = LuaEngine::new()?;
+    lctx.load_document(doc)?;
+    lctx.load_script(&script)?;
+    let res = lctx.get_document()?;
+    Ok(res)
 }
 
 async fn export_doc<P: AsRef<Path>>(
