@@ -99,7 +99,7 @@ impl ToLua<'_> for LuaObjectIdRepr {
         let obj = lua.create_table()?;
         obj.set("__type", "ObjectId")?;
         obj.set("__value", self.0.bytes().to_lua(lua)?)?;
-        obj.set("string_repr", self.0.to_string().to_lua(lua)?)?;
+        obj.set("stringRepr", self.0.to_string().to_lua(lua)?)?;
         obj.to_lua(lua)
     }
 }

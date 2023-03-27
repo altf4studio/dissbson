@@ -1,0 +1,8 @@
+{
+	"Lua.diagnostics.globals": [
+		"dump_table",
+		"doc",
+		"seaHash",
+		"dumpTable"
+	]
+}
