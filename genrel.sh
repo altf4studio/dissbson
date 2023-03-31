@@ -63,9 +63,9 @@ for TARGET in $TARGETS; do
 	cargo build --release --target "$TARGET"
 	mkdir -p "dist/$TARGET"
 	cp "target/$TARGET/release/$BINNAME" "dist/$TARGET"
-	zip -j "dist/$NAME-$TARGET.zip" "dist/$TARGET/$BINNAME" "dist/latest.txt" "LICENSE" "readme.md"
+	zip -j "dist/$NAME-$TARGET.$VER.zip" "dist/$TARGET/$BINNAME" "dist/latest.txt" "LICENSE" "readme.md"
 	rm -rf "dist/$TARGET"
-	echo "$TARGET $NAME-$TARGET.zip" >> dist/manifest.txt
+	echo "$TARGET $NAME-$TARGET.zip" >> dist/manifest.$VER.txt
 done
 
 # Make the source distribution
