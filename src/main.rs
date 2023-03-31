@@ -1,6 +1,16 @@
+use bson::Document;
+use clap::Parser;
+use flate2::write::{ZlibDecoder, ZlibEncoder};
+use flate2::Compression;
+use lua_engine::LuaEngine;
+use neoncore::streams::{read::read_pattern, SeekRead};
 use parking_lot::RwLock;
-use std::fmt::format;
-use std::fs::remove_file;
+use rayon::prelude::IndexedParallelIterator;
+use rayon::{
+    prelude::{IntoParallelRefIterator, ParallelIterator},
+    ThreadPoolBuilder,
+};
+use serde::{ser::SerializeSeq, Deserialize, Serialize, Serializer};
 use std::sync::Arc;
 use std::{
     fs::{File, OpenOptions},
@@ -8,21 +18,7 @@ use std::{
     ops::Bound,
     path::{Path, PathBuf},
 };
-
-use rayon::{
-    prelude::{IntoParallelRefIterator, ParallelIterator},
-    ThreadPoolBuilder,
-};
 use thiserror::Error;
-
-use bson::Document;
-use clap::Parser;
-use flate2::write::{ZlibDecoder, ZlibEncoder};
-use flate2::Compression;
-use lua_engine::LuaEngine;
-use neoncore::streams::{read::read_pattern, SeekRead};
-use rayon::prelude::IndexedParallelIterator;
-use serde::{ser::SerializeSeq, Deserialize, Serialize, Serializer};
 
 mod lua_engine;
 
