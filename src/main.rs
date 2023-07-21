@@ -96,7 +96,7 @@ struct DocOffset {
 fn main() -> Result<(), DissectError> {
     println!("---------------------------------------");
     println!("BSON Dissector v{}", env!("CARGO_PKG_VERSION"));
-    println!("Copyright (c) 2023 Neon Imp");
+    println!("Copyright (c) 2023 DuplexLayer");
     println!("Licensed under the BSD-3-Clause License");
     println!("---------------------------------------\n");
 
@@ -139,32 +139,32 @@ fn main() -> Result<(), DissectError> {
     let pb = indicatif::ProgressBar::new(idx.len() as u64);
     pb.set_style(indicatif::ProgressStyle::default_bar().template(
         "{spinner:.green} [{elapsed_precise}] [{eta_precise}] [{bar:40.red/blue}] {pos:>7}/{len:7} \n {msg}",
-    ).unwrap());
+    ).expect("Failed to set progress bar style"));
 
     let thread_pool = ThreadPoolBuilder::new().num_threads(args.threads).build()?;
 
     if args.single {
-        let mut file = File::create(output).unwrap();
+        let mut file = File::create(output).expect("Failed to create output file");
         let mut bufwriter = BufWriter::new(&mut file);
         let mut ser = serde_json::Serializer::new(&mut bufwriter);
-        let writer = Arc::new(RwLock::new(ser.serialize_seq(Some(idx.len())).unwrap()));
+        let writer = Arc::new(RwLock::new(ser.serialize_seq(Some(idx.len())).expect("Failed to serialize json array")));
 
         thread_pool.install(|| {
             let chunk_ct = Arc::new(RwLock::new(0));
             idx.par_iter().chunks(args.batch).for_each(|offsets| {
                 let docs = if let Some(script) = &args.script {
-                    apply_script(path, script, offsets).unwrap()
+                    apply_script(path, script, offsets).expect("Failed to apply script")
                 } else {
-                    load_docs(path, offsets).unwrap()
+                    load_docs(path, offsets).expect("Failed to load docs")
                 };
 
                 let mut writer_lock = writer.write();
                 for doc in docs {
-                    writer_lock.serialize_element(&doc).unwrap();
+                    writer_lock.serialize_element(&doc).expect("Failed to serialize element");
                 }
 
                 pb.inc(args.batch as u64);
-                *chunk_ct.write() += 1
+                *chunk_ct.write() += 1;
             });
         });
         match Arc::try_unwrap(writer) {
@@ -193,11 +193,11 @@ fn main() -> Result<(), DissectError> {
                         format!("{}-{}", chunk_ct.read(), nth),
                         args.pretty,
                     )
-                    .unwrap();
+                    .expect("Failed to save doc");
                 }
 
                 pb.inc(args.batch as u64);
-                *chunk_ct.write() += 1
+                *chunk_ct.write() += 1;
             });
         });
     }
@@ -300,7 +300,7 @@ fn apply_script<P: AsRef<Path>>(
     let docs = load_docs(input, offsets)?;
     let mut res = Vec::with_capacity(docs.len());
     let lctx = LuaEngine::new()
-        .map_err(|e| DissectError::Unexpected(format!("Failed to create Lua context: {}", e)))?;
+        .map_err(|e| DissectError::Unexpected(format!("Failed to create Lua context: {e}")))?;
     for doc in docs {
         lctx.load_document(doc)?;
         lctx.load_script(&script)?;
@@ -336,7 +336,7 @@ fn save_single_doc<P: AsRef<Path>>(
         .write(true)
         .create(true)
         .truncate(true)
-        .open(out_dir.join(format!("{}.json", idx)))?;
+        .open(out_dir.join(format!("{idx}.json")))?;
     let writer = BufWriter::new(&mut file);
     if pretty {
         let mut ser = serde_json::Serializer::pretty(writer);
